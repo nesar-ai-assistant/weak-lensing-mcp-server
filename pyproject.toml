@@ -1,0 +1,53 @@
+[build-system]
+requires = ["setuptools>=69", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "weak-lensing-mcp-server"
+version = "0.1.0"
+description = "MCP server for public weak-lensing data: DES Y3 (Y6 pending), KiDS-1000, KiDS-Legacy, HSC Y3 cosmic shear / 3x2pt data vectors, n(z), covariances and chains"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "mcp[cli]>=1.27,<2",
+    "pydantic>=2,<3",
+    "numpy",
+    "scipy",
+    "matplotlib>=3.8",
+    "astropy>=6",
+    "pandas>=2",
+    "certifi",
+    "sacc>=0.12",
+]
+
+[project.optional-dependencies]
+getdist = ["getdist"]
+dev = ["pytest", "anyio", "ruff"]
+# hpc = ["hep-genesis[iri]"]  # server-side dispatch: pip install -e <hep-genesis-agent>/backend[iri]
+
+[tool.mcp-server]
+name = "Weak Lensing Surveys MCP Server"
+skill_prefix = "wl"
+instructions_file = "mcp_server/INSTRUCTIONS.md"
+tool_modules = [
+    "tools.meta",
+    "tools.datavectors",
+    "tools.chains",
+    "mcp_server.dispatch",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["mcp_server*", "tools*"]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+testpaths = ["tests"]
+markers = ["network: needs internet (deselect with -m 'not network')"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "B"]
+ignore = ["E501", "B008"]

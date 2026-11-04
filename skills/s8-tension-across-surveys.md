@@ -1,9 +1,14 @@
 ---
 name: s8-tension-across-surveys
-description: Quantify the S8 tension of DES Y3, KiDS-1000, KiDS-Legacy and HSC Y3 against Planck 2018 - re-analyse public chains, overlay Om-S8 contours, whisker plot with sigma tensions
+description: TIER 3 (comparison only) - quantify the S8 tension of DES Y3, KiDS-1000, KiDS-Legacy and HSC Y3 against Planck 2018 from the surveys' published chains; contours and a whisker plot with sigma tensions
 ---
 
-# S8 tension across surveys
+# S8 tension across surveys (tier 3 - comparison only)
+
+Every number here is the surveys' PUBLISHED inference (tier 3). Use it to put
+YOUR tier-1/2 analysis in context, e.g. after `measure-kids1000-xi-from-catalogue`
+or a fit to `fetch_wl_datavector` output. Never treat it as a measurement or
+as a prior in your own fit.
 
 Goal: a defensible, sourced statement like "DES Y3 3x2pt sits 2.5 sigma below
 Planck while KiDS-Legacy is consistent at 0.8 sigma". One `output_dir`.
@@ -22,7 +27,7 @@ Expected (mean +/- std | mode, HPD68):
 - KiDS-Legacy COSEBIs: 0.814 +/- 0.019 (paper mean 0.813 +/- 0.018; mode 0.815 +0.016/-0.021).
 - HSC Y3: chains are credentialed (tool raises with manual-download steps);
   use the published 0.769 +0.031/-0.034 (real space, Li+23) and 0.776 +0.032/-0.033
-  (Fourier, Dalal+23), which compare_s8_constraints includes by default.
+  (Fourier, Dalal+23), which compare_s8_with_published includes by default.
 
 ## 2. Contours
 `plot_s8_om_contours([<3 chain CSVs>], output_dir, labels=["DES Y3 3x2pt","KiDS-1000","KiDS-Legacy"])`.
@@ -30,7 +35,7 @@ Check: banana degeneracy in sigma8-Om collapses to a horizontal band in S8-Om;
 KiDS-1000 prefers low Om (~0.26-0.29), DES ~0.34.
 
 ## 3. Tension
-`compare_s8_constraints(output_dir, marginals_json=[<3 JSONs>])` (keeps the
+`compare_s8_with_published(output_dir, marginals_json=[<3 JSONs>])` (keeps the
 published entries). Expected sigma vs Planck 0.832 +/- 0.013:
 DES Y3 3x2pt ~2.5-2.6, KiDS-1000 ~2.7 (published) / ~3.1 (chain mean), KiDS-Legacy ~0.8,
 HSC Y3 real ~1.9, Fourier ~1.6.

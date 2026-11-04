@@ -1,32 +1,47 @@
 ---
 name: wl-tour
-description: First-contact tour - one call per tool family (data vectors, n(z), covariance, S/N, chains, S8 comparison) on DES Y3, all local, ~1-3 min incl. ~60 MB of downloads
+description: First-contact tour by data tier - KiDS-1000 shear catalogue subset (tier 1) -> your own xi+- and n(z) (tier 2) -> released data vectors, S/N and a fit-ready vector (tier 2) -> compare with published S8 (tier 3, comparison only); ~5-10 min, ~150 MB downloads
 ---
 
-# Weak-lensing server tour
+# Weak-lensing server tour (tier 1 -> tier 2 -> compare with tier 3)
 
-Use one `output_dir` (e.g. `output/tour`). Everything runs locally; first
-use downloads the DES Y3 2pt FITS (28 MB) and one chain (~10 MB) into
-`~/.cache/cosmo-mcp/weak-lensing-mcp-server`.
+Use one `output_dir` (e.g. `output/tour`). Everything runs locally. Downloads go to
+`~/.cache/cosmo-mcp/weak-lensing-mcp-server` (catalogue tiles are cached per tile).
 
-1. `list_wl_datasets()` - five keys: des_y3, des_y6 (unreleased), kids_1000,
-   kids_legacy, hsc_y3. `describe_wl_dataset("des_y3")` lists statistics and chain keys.
-2. `fetch_wl_datavector("des_y3", "xip", output_dir)` and the same with `"xim"`.
-   Expect 200 points each, 10 bin pairs (4 source bins x 20 angles, centres 2.8-225 arcmin).
-   Files: `des_y3_xip.csv` (bin1, bin2, angbin, x, value, error) + `des_y3_xip_cov.npy`.
-3. `plot_shear_correlation(xip_csv, output_dir, xim_csv=xim_csv, label="DES Y3")` -
-   xi+ in the upper triangle, xi- in the lower, theta*xi*1e4 on the y axis.
-4. `plot_redshift_distributions(["des_y3"], output_dir)` - mean z of the
-   4 source bins 0.33, 0.52, 0.74, 0.93 (`metadata.mean_z`).
-5. `plot_covariance(xip_cov_npy, output_dir)` - `positive_definite` true.
-6. `compute_signal_to_noise(["des_y3"], ["xip","xim"], output_dir)` -
-   S/N about 44.7 (uncut; 3x2pt with gammat+wtheta about 264).
-7. `fetch_wl_chain("des_y3", "3x2pt_lcdm", output_dir)` then
-   `analyze_wl_chain("des_y3", "3x2pt_lcdm", output_dir)` -
-   S8 = 0.776 +/- 0.018, Om = 0.339 +/- 0.031, sigma8 = 0.733 +/- 0.046
-   (paper: S8 = 0.776 +/- 0.017).
-8. `compare_s8_constraints(output_dir, marginals_json=[<step 7 json>])` -
-   whisker plot vs Planck 0.832 +/- 0.013; DES Y3 3x2pt tension about 2.5-2.6 sigma.
+## Tier 1 - catalogue
+1. `list_wl_datasets()` - per-tier product counts. `describe_wl_dataset("kids_1000")`
+   has `shear_catalog` (URL, 21,262,011 rows, m-bias per bin, z_B edges).
+2. `fetch_shear_catalog(output_dir, tiles=["KIDS_180p0_m0p5","KIDS_181p0_m0p5",
+   "KIDS_180p0_0p5","KIDS_181p0_0p5"])` - 4 KiDS-North tiles, ~60k galaxies,
+   ~70 MB of Range reads, ~30 s. Writes a slim FITS with ra, dec, e1, e2, weight, z_b, tomo_bin.
+3. `plot_shear_catalog(fits, output_dir)` - sigma_e ~0.265 per component, n_eff ~5.5-6 arcmin^-2,
+   <e1>_w ~ +2e-3 (KiDS's known additive c1), <e2>_w ~ 0.
 
-Report: the S/N, the S8 value, the tension, and the PNG paths. Next steps:
-`s8-tension-across-surveys`, `reproduce-des-y3-shear-figure`, `wl-datavector-inspection`.
+## Tier 1 -> tier 2 - your own summary statistics
+4. `measure_nz_from_catalog(fits, output_dir)` - weighted z_B means 0.2/0.4/0.6/0.8/1.0-ish,
+   overlaid on the released SOM n(z) (means 0.26/0.40/0.56/0.79/0.98).
+5. `measure_shear_correlation(fits, output_dir, bin_pairs=[[3,3],[4,4],[5,5],[4,5]])` -
+   treecorr, weights, c-term removed, xi/((1+m_i)(1+m_j)). On 4 deg^2 the
+   errors are large. For a real detection use the recipe
+   `measure-kids1000-xi-from-catalogue` (~75 deg^2).
+
+## Tier 2 - released data vectors (the analysis-grade product)
+6. `fetch_wl_datavector("kids_1000", "xip", output_dir)` (and `"xim"`), then
+   `compare_measured_with_published_xi(<your *_xip_measured.csv>, output_dir)` -
+   your xi vs the 1006 deg^2 release, chi2 with your errors.
+7. `fetch_wl_datavector("des_y3", "xip", output_dir)` ->
+   `plot_shear_correlation(csv, output_dir, xim_csv=..., label="DES Y3")`,
+   `plot_redshift_distributions(["des_y3","kids_1000"], output_dir)`,
+   `plot_covariance(cov_npy, output_dir)` (positive_definite true),
+   `compute_signal_to_noise(["des_y3"], ["xip","xim"], output_dir)` - S/N ~44.7.
+   These are what your own fit takes in, along with n(z) and the covariance.
+
+## Tier 3 - compare with published (COMPARISON ONLY)
+8. `analyze_wl_chain("des_y3", "3x2pt_lcdm", output_dir)` - S8 = 0.776 +/- 0.018
+   (paper 0.776 +/- 0.017). Then `compare_s8_with_published(output_dir, marginals_json=[...])`
+   gives the tension vs Planck (~2.5 sigma). This is the published inference,
+   NOT a measurement: never use it as data or as a prior in your own fit.
+
+Report: what tier each number came from, the n_eff/sigma_e, your xi chi2 vs the release, and the PNG paths.
+Next: `measure-kids1000-xi-from-catalogue`, `wl-datavector-inspection`,
+`reproduce-des-y3-shear-figure`, `s8-tension-across-surveys` (tier 3).

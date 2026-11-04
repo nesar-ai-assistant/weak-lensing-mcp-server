@@ -6,7 +6,7 @@ import numpy as np
 import pytest
 from astropy.io import fits
 
-from tools.chains import compare_s8_constraints, kernels
+from tools.chains import compare_s8_with_published, kernels
 from tools.datavectors import io
 from tools.registry import DATASETS, PUBLISHED_S8
 
@@ -60,7 +60,7 @@ def test_chain_kernel_recovers_gaussian(tmp_path):
 
 
 def test_compare_s8_published_tensions(tmp_path):
-    r = compare_s8_constraints(str(tmp_path))
+    r = compare_s8_with_published(str(tmp_path))
     t = r.metadata["tension_sigma"]
     assert 2.4 < t["DES Y3 3x2pt"] < 2.8
     assert t["KiDS-Legacy COSEBIs"] < 1.0

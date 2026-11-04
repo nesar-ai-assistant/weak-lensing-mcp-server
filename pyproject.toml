@@ -28,6 +28,7 @@ dev = ["pytest", "anyio", "ruff"]
 [tool.mcp-server]
 name = "Weak Lensing Surveys MCP Server"
 skill_prefix = "wl"
+port = 8013
 instructions_file = "mcp_server/INSTRUCTIONS.md"
 tool_modules = [
     "tools.meta",

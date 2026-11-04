@@ -1,4 +1,4 @@
-"""Tier-1 shear-catalogue tests. Offline tests use a synthetic catalogue with a known shear signal;
+"""Shear-catalogue tests. Offline tests use a synthetic catalogue with a known shear signal;
 network tests read real KiDS-1000 gold-catalogue rows with HTTP Range requests."""
 
 import numpy as np
@@ -75,9 +75,9 @@ def test_correlation_removes_c_and_corrects_m(tmp_path):
 def test_catalog_tools_offline(tmp_path):
     path = _synthetic_catalog(tmp_path / "cat.fits")
     q = plot_shear_catalog(path, str(tmp_path))
-    assert q.metadata["data_tier"] == 1 and abs(q.metadata["sigma_e"] - 0.27) < 0.01
+    assert q.metadata["data_kind"] == "catalog" and abs(q.metadata["sigma_e"] - 0.27) < 0.01
     r = measure_shear_correlation(path, str(tmp_path), min_sep=2, max_sep=60, nbins=4)
-    assert r.metadata["data_tier"] == 1 and r.metadata["bin_pairs"] == [[3, 3], [3, 4], [4, 4]]
+    assert r.metadata["data_kind"] == "catalog" and r.metadata["bin_pairs"] == [[3, 3], [3, 4], [4, 4]]
     assert measure_shear_correlation.weight == "heavy"
     near = r.metadata["xip_near_10arcmin"]["33"]
     assert abs(near["xip"]) < 5 * near["xip_err"]          # pure noise -> consistent with 0
@@ -125,7 +125,7 @@ def test_fetch_one_kids1000_tile(tmp_path):
     from tools.catalogs import _subset_spec
 
     r = fetch_shear_catalog(str(tmp_path), tiles=["KIDS_181p0_0p5"], tomo_bins=[3, 4, 5], max_rows=5000)
-    assert r.metadata["n_rows"] == 5000 and r.metadata["data_tier"] == 1
+    assert r.metadata["n_rows"] == 5000 and r.metadata["data_kind"] == "catalog"
     t = Table.read(r.files[0])
     assert 180.3 < np.median(t["ra"]) < 181.7 and -0.2 < np.median(t["dec"]) < 1.2
     assert 0.2 < np.std(t["e1"]) < 0.4 and set(np.unique(t["tomo_bin"])) <= {3, 4, 5}

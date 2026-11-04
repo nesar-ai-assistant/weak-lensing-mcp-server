@@ -8,7 +8,7 @@ from typing import Annotated, Literal
 import numpy as np
 from pydantic import Field, validate_call
 
-from ..common import ArtifactResult, mpl, ok, resolve_outdir, save_fig, tier
+from ..common import ArtifactResult, data_kind, mpl, ok, resolve_outdir, save_fig
 from ..registry import DATASETS
 from . import io
 
@@ -29,7 +29,7 @@ def _read_csv(path: str) -> dict:
     return pd.read_csv(path)
 
 
-@tier(2)
+@data_kind("summary_statistic")
 @validate_call
 def fetch_wl_datavector(
     dataset: Annotated[Dataset, Field(description="Survey release key (see list_wl_datasets).")],
@@ -69,7 +69,7 @@ def fetch_wl_datavector(
               citation=DATASETS[dataset]["citation"])
 
 
-@tier(2)
+@data_kind("summary_statistic")
 @validate_call
 def plot_shear_correlation(
     xip_csv: Annotated[str, Field(description="CSV from fetch_wl_datavector(statistic='xip').")],
@@ -126,7 +126,7 @@ def plot_shear_correlation(
     return ok(f"Triangle plot of {nb} tomographic bins.", [png], n_bins=nb, lower_triangle=m is not None)
 
 
-@tier(2)
+@data_kind("summary_statistic")
 @validate_call
 def plot_redshift_distributions(
     datasets: Annotated[list[Dataset], Field(min_length=1, description="One or more dataset keys.")],
@@ -170,7 +170,7 @@ def plot_redshift_distributions(
     return ok(f"n(z) for {len(datasets)} dataset(s).", files, mean_z=means)
 
 
-@tier(2)
+@data_kind("summary_statistic")
 @validate_call
 def plot_covariance(
     cov_npy: Annotated[str, Field(description="Covariance .npy from fetch_wl_datavector.")],
@@ -202,7 +202,7 @@ def plot_covariance(
               positive_definite=bool(eig.min() > 0), condition_number=float(eig.max() / eig.min()) if eig.min() > 0 else None)
 
 
-@tier(2)
+@data_kind("summary_statistic")
 @validate_call
 def compute_signal_to_noise(
     datasets: Annotated[list[Dataset], Field(min_length=1, description="Dataset keys.")],

@@ -1,4 +1,4 @@
-"""Tier-1 shear-catalogue kernels (JSON in -> JSON out, files to cwd).
+"""Shear-catalogue kernels (JSON in -> JSON out, files to cwd).
 
 Imports only numpy + astropy (+ stdlib, certifi optional); ``shear_correlation``
 also needs treecorr (declared pip_dep). Everything here runs unchanged on an
@@ -274,7 +274,7 @@ def kids1000_subset(tile_ranges: dict, out_file: str, ra_range=None, dec_range=N
             "tomo_counts": {str(int(b)): int((tb == b).sum()) for b in np.unique(tb)}}
 
 
-# ------------------------------------------------------------------ tier 1 -> tier 2: xi+/xi-
+# ------------------------------------------------------------------ shear catalogue -> xi+/xi-
 def load_catalog(path: str) -> dict:
     """Slim catalogue (FITS from fetch_shear_catalog) -> dict of numpy arrays."""
     from astropy.table import Table
@@ -373,7 +373,7 @@ def shear_correlation(catalog_file: str, bin_pairs: list, m_bias: dict | None = 
     return {"csv": str(out_csv), "n_rows": len(rows), **info, "rows": rows}
 
 
-# ------------------------------------------------------------------ tier 1 -> tier 2: n(z) histogram
+# ------------------------------------------------------------------ shear catalogue -> n(z) histogram
 def nz_histogram(z: np.ndarray, w: np.ndarray, tomo: np.ndarray, bins: list[int], z_edges: np.ndarray) -> dict:
     """Weighted, unit-normalised histogram of a redshift column per tomographic bin."""
     zc = 0.5 * (z_edges[1:] + z_edges[:-1])

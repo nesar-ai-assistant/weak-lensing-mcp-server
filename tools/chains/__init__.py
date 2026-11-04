@@ -1,6 +1,6 @@
-"""TIER 3 - published MCMC chains and S8 constraints: COMPARISON ONLY.
+"""Published MCMC chains and S8 constraints: for comparison only.
 
-Fetch / summarise / plot the surveys' own posteriors to compare with YOUR analysis of tier-1/2 data
+Fetch / summarise / plot the surveys' own posteriors to compare with YOUR analysis of shear catalogues / summary statistics
 (fetch_shear_catalog -> measure_shear_correlation, fetch_wl_datavector). Nothing here is a measurement:
 never feed these chains or S8 values into a fit as data or as an unlabelled prior.
 """
@@ -13,7 +13,7 @@ from typing import Annotated, Literal
 import numpy as np
 from pydantic import Field, validate_call
 
-from ..common import ArtifactResult, data_cache_dir, mpl, ok, resolve_outdir, save_fig, tier
+from ..common import ArtifactResult, data_cache_dir, data_kind, mpl, ok, resolve_outdir, save_fig
 from ..datavectors import io as dvio
 from ..registry import PLANCK18_S8, PUBLISHED_S8
 from . import kernels
@@ -69,7 +69,7 @@ def chain_local_path(dataset: str, chain: str) -> Path:
     return dvio.download(url, subdir=dataset, timeout=900)
 
 
-@tier(3)
+@data_kind("published_result")
 @validate_call
 def fetch_wl_chain(
     dataset: Annotated[Dataset, Field(description="Survey release key.")],
@@ -80,7 +80,7 @@ def fetch_wl_chain(
     max_rows: Annotated[int, Field(ge=1000, le=2_000_000, description="Cap on rows written to the CSV "
                                                                       "(highest-weight rows kept).")] = 200_000,
 ) -> ArtifactResult:
-    """Download a published MCMC/nested-sampling chain and write a slim CSV (tier 3, comparison only).
+    """Download a published MCMC/nested-sampling chain and write a slim CSV (published result, for comparison only).
 
     Use before analyze_wl_chain / plot_s8_om_contours. The CSV holds
     weight, omega_m, sigma_8, S_8 (derived as sigma_8 sqrt(Om/0.3) where the
@@ -108,14 +108,14 @@ def _fmt(p: dict) -> str:
     return f"{p['mean']:.3f} +/- {p['std']:.3f}"
 
 
-@tier(3)
+@data_kind("published_result")
 @validate_call
 def analyze_wl_chain(
     dataset: Annotated[Dataset, Field(description="Survey release key.")],
     chain: Annotated[str, Field(description="Chain key (as fetch_wl_chain).")],
     output_dir: OutDir,
 ) -> ArtifactResult:
-    """Marginal S8, Omega_m, sigma8 (h, w) of a PUBLISHED chain (tier 3, comparison only).
+    """Marginal S8, Omega_m, sigma8 (h, w) of a PUBLISHED chain (published result, for comparison only).
 
     Use to quote a survey's parameter constraints. Reports mean +/- std,
     median with 16/84% quantiles, 95% intervals, and the marginal mode with
@@ -167,7 +167,7 @@ def _levels(H, masses=(0.95, 0.68)):
     return sorted(float(f[np.searchsorted(c, m)]) for m in masses)
 
 
-@tier(3)
+@data_kind("published_result")
 @validate_call
 def plot_s8_om_contours(
     chain_csvs: Annotated[list[str], Field(min_length=1, description="Chain CSVs from fetch_wl_chain.")],
@@ -176,7 +176,7 @@ def plot_s8_om_contours(
     y_param: Annotated[Literal["S_8", "sigma_8"], Field(description="y-axis parameter.")] = "S_8",
     show_planck: Annotated[bool, Field(description="Draw the Planck 2018 S8 band.")] = True,
 ) -> ArtifactResult:
-    """Overlay published 68/95% Omega_m - S8 (or sigma8) contours (tier 3, comparison only).
+    """Overlay published 68/95% Omega_m - S8 (or sigma8) contours (published result, for comparison only).
 
     Use to reproduce the classic multi-survey S8-Om figure (DES Y3 Fig. 7 /
     Asgari+21 Fig. 5 style). Contours come from a weighted, smoothed 2D
@@ -208,7 +208,7 @@ def plot_s8_om_contours(
     return ok(f"Contours for {len(chain_csvs)} chains.", [png], y_param=y_param)
 
 
-@tier(3)
+@data_kind("published_result")
 @validate_call
 def compare_s8_with_published(
     output_dir: OutDir,
@@ -219,7 +219,7 @@ def compare_s8_with_published(
     reference_mean: Annotated[float, Field(description="Reference S8 (default Planck 2018).")] = 0.832,
     reference_sigma: Annotated[float, Field(gt=0, description="Reference S8 1-sigma.")] = 0.013,
 ) -> ArtifactResult:
-    """Compare S8 with published values: whisker plot vs Planck 2018 and tension in sigma (tier 3, comparison only).
+    """Compare S8 with published values: whisker plot vs Planck 2018 and tension in sigma (published result, for comparison only).
 
     Use for 'is there an S8 tension' questions. Tension per entry is the
     Gaussian difference-in-means (S8_ref - S8) / sqrt(sigma^2 + sigma_ref^2),

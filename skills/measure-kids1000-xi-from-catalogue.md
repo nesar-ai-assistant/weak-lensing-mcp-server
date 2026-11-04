@@ -1,9 +1,9 @@
 ---
 name: measure-kids1000-xi-from-catalogue
-description: Tier 1 -> tier 2 - fetch a ~75 deg^2 KiDS-1000 gold shear-catalogue subset, QA it, measure xi+/xi- in 5 tomographic bins with treecorr (weights, m-bias, c-term, jackknife), histogram n(z), and validate against the released KiDS-1000 xi+- with the area-scaled covariance; ~10 min, ~800 MB of Range reads
+description: From shear catalogue to xi+- - fetch a ~75 deg^2 KiDS-1000 gold shear-catalogue subset, QA it, measure xi+/xi- in 5 tomographic bins with treecorr (weights, m-bias, c-term, jackknife), histogram n(z), and validate against the released KiDS-1000 xi+- with the area-scaled covariance; ~10 min, ~800 MB of Range reads
 ---
 
-# Measure KiDS-1000 cosmic shear from the catalogue (tier 1 -> tier 2)
+# Measure KiDS-1000 cosmic shear from the catalogue
 
 Goal: your own xi+- data vector from the per-galaxy shear catalogue,
 validated against the released KiDS-1000 xi+-. The release covers 1006 deg^2
@@ -51,6 +51,6 @@ Pitfalls
 - Contiguous blocks matter: scattered tiles lose all the large-scale pairs.
 - KiDS-North RA 128-238 / Dec -4..+4; KiDS-South RA 330-55 / Dec -36..-26.
 
-Final step (tier 3, comparison only): to put your measurement in cosmological context,
+Final step (compare with published results, for comparison only): to put your measurement in cosmological context,
 compare with the published KiDS-1000 S8 via `compare_s8_with_published` / `analyze_wl_chain("kids_1000", "xipm")`.
 Do NOT use those chains as a prior when fitting your xi.

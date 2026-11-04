@@ -1,12 +1,12 @@
 ---
 name: s8-tension-across-surveys
-description: TIER 3 (comparison only) - quantify the S8 tension of DES Y3, KiDS-1000, KiDS-Legacy and HSC Y3 against Planck 2018 from the surveys' published chains; contours and a whisker plot with sigma tensions
+description: Published results (for comparison only) - quantify the S8 tension of DES Y3, KiDS-1000, KiDS-Legacy and HSC Y3 against Planck 2018 from the surveys' published chains; contours and a whisker plot with sigma tensions
 ---
 
-# S8 tension across surveys (tier 3 - comparison only)
+# S8 tension across surveys (published results, for comparison only)
 
-Every number here is the surveys' PUBLISHED inference (tier 3). Use it to put
-YOUR tier-1/2 analysis in context, e.g. after `measure-kids1000-xi-from-catalogue`
+Every number here is the surveys' PUBLISHED inference. Use it to put
+YOUR own analysis of catalogues / summary statistics in context, e.g. after `measure-kids1000-xi-from-catalogue`
 or a fit to `fetch_wl_datavector` output. Never treat it as a measurement or
 as a prior in your own fit.
 

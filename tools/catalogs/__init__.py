@@ -1,4 +1,4 @@
-"""Tier-1 shear catalogues: subset download, QA plots, and tier-1 -> tier-2 reductions (xi+-, n(z)).
+"""Shear catalogues: subset download, QA plots, and reduction from shear catalogue to xi+- and n(z).
 
 KiDS-1000 gold WL catalogue (Giblin+21) is the public catalogue-level product: one 17.7 GB FITS
 table read as SUBSETS with HTTP Range requests (bundled tile index: data/kids1000_gold_tile_runs.npz).
@@ -14,7 +14,7 @@ from typing import Annotated, Literal
 import numpy as np
 from pydantic import Field, validate_call
 
-from ..common import BUNDLED_DATA, ArtifactResult, data_cache_dir, mpl, ok, param_slug, resolve_outdir, save_fig, tier
+from ..common import BUNDLED_DATA, ArtifactResult, data_cache_dir, data_kind, mpl, ok, param_slug, resolve_outdir, save_fig
 from ..registry import DATASETS
 from . import kernels
 
@@ -53,7 +53,7 @@ KIDS1000_AREA_EFF = 777.4  # deg^2, effective KiDS-1000 shear area (Giblin et al
 
 def _not_public(dataset: str) -> None:
     if dataset != "kids_1000":
-        note = DATASETS[dataset].get("tier1_note", "no public shear catalogue")
+        note = DATASETS[dataset].get("catalog_note", "no public shear catalogue")
         raise RuntimeError(f"{dataset}: shear catalogue not available through this server. {note}")
 
 
@@ -68,7 +68,7 @@ def _tile_ranges(index: dict, tiles: list[str]) -> dict:
     return {t: [[int(s), int(n)] for s, n in r[r[:, 0] == tid[t]][:, 1:]] for t in tiles}
 
 
-@tier(1)
+@data_kind("catalog")
 @validate_call
 def fetch_shear_catalog(
     output_dir: OutDir,
@@ -88,7 +88,7 @@ def fetch_shear_catalog(
                                                                "and ~10-40 s per tile).")] = 4,
     max_rows: Annotated[int | None, Field(ge=100, description="Stop once this many galaxies pass the cuts.")] = None,
 ) -> ArtifactResult:
-    """Download a SUBSET of the KiDS-1000 gold weak-lensing shear catalogue (tier 1) as a slim FITS.
+    """Download a SUBSET of the KiDS-1000 gold weak-lensing shear catalogue as a slim FITS.
 
     Use this first for any catalogue-level / measure-it-yourself question.
     The 17.7 GB, 21.3M-galaxy file is never downloaded whole: whole tiles
@@ -127,13 +127,13 @@ def _load(path: str) -> dict:
     return kernels.load_catalog(path)
 
 
-@tier(1)
+@data_kind("catalog")
 @validate_call
 def plot_shear_catalog(
     catalog_fits: Annotated[str, Field(description="Slim FITS from fetch_shear_catalog.")],
     output_dir: OutDir,
 ) -> ArtifactResult:
-    """QA plots of a tier-1 shear catalogue: e1/e2 and weight histograms, z_B, and the sky footprint.
+    """QA plots of a shear catalogue: e1/e2 and weight histograms, z_B, and the sky footprint.
 
     Use right after fetch_shear_catalog to check what was downloaded.
     Reports weighted mean e1/e2 (the additive c-terms, ~1e-4..1e-3 for
@@ -205,10 +205,10 @@ def _bin_pairs(spec: list[list[int]] | None, bins: list[int]) -> list[list[int]]
     return [[i, j] for i in bins for j in bins if i <= j]
 
 
-@tier(1)
+@data_kind("catalog")
 @validate_call
 def measure_shear_correlation(
-    catalog_fits: Annotated[str, Field(description="Slim FITS from fetch_shear_catalog (tier-1 input).")],
+    catalog_fits: Annotated[str, Field(description="Slim FITS from fetch_shear_catalog (shear catalogue input).")],
     output_dir: OutDir,
     bin_pairs: Annotated[list[list[int]] | None, Field(description="Tomographic bin pairs, e.g. [[3,3],[4,5]] "
                                                                    "(default: all auto + cross pairs present).")] = None,
@@ -222,7 +222,7 @@ def measure_shear_correlation(
                                                            "only; needs >~ 4 deg^2 for >= 10 patches).")] = 0,
     bin_slop: Annotated[float, Field(ge=0, le=1, description="treecorr bin_slop (accuracy vs speed).")] = 0.05,
 ) -> ArtifactResult:
-    """Measure xi+(theta) and xi-(theta) per tomographic bin pair from a shear catalogue (tier 1 -> tier 2).
+    """Measure xi+(theta) and xi-(theta) per tomographic bin pair from a shear catalogue.
 
     Use to turn fetch_shear_catalog output into your own cosmic-shear
     data vector. Weighted treecorr GG correlation with per-bin additive
@@ -285,16 +285,16 @@ def measure_shear_correlation(
 measure_shear_correlation.weight = "heavy"
 
 
-@tier(1)
+@data_kind("catalog")
 @validate_call
 def measure_nz_from_catalog(
     catalog_fits: Annotated[str, Field(description="Slim FITS from fetch_shear_catalog.")],
     output_dir: OutDir,
     z_column: Annotated[Literal["z_b"], Field(description="Photo-z column to histogram (BPZ z_B).")] = "z_b",
     dz: Annotated[float, Field(gt=0.005, le=0.2, description="Histogram bin width.")] = 0.05,
-    compare_release: Annotated[bool, Field(description="Overlay the released KiDS-1000 SOM n(z) (tier 2).")] = True,
+    compare_release: Annotated[bool, Field(description="Overlay the released KiDS-1000 SOM n(z).")] = True,
 ) -> ArtifactResult:
-    """Weighted photo-z histogram n(z) per tomographic bin from a shear catalogue (tier 1 -> tier 2).
+    """Weighted photo-z histogram n(z) per tomographic bin from a shear catalogue.
 
     Use for 'what redshifts does my subset probe'. This is the naive
     lensfit-weighted z_B histogram; by construction each bin is confined
@@ -344,7 +344,7 @@ def measure_nz_from_catalog(
               mean_z=means, release_mean_z=rel_mean or None, counts={str(b): res["bins"][str(b)]["n"] for b in bins})
 
 
-@tier(2)
+@data_kind("summary_statistic")
 @validate_call
 def compare_measured_with_published_xi(
     measured_xip_csv: Annotated[str, Field(description="*_xip_measured.csv (or xim) from measure_shear_correlation.")],
@@ -355,7 +355,7 @@ def compare_measured_with_published_xi(
                                                     "if given, also fit the amplitude with the RELEASE covariance "
                                                     "(noise + cosmic variance) scaled by 777.4 deg^2 / area.")] = None,
 ) -> ArtifactResult:
-    """Overlay your own catalogue-measured xi+/- on the released KiDS-1000 xi+/- (both tier 2) per bin pair.
+    """Overlay your own catalogue-measured xi+/- on the released KiDS-1000 xi+/- (both summary statistics) per bin pair.
 
     Use after measure_shear_correlation to validate the measurement. The
     release covers ~1006 deg^2 (777 deg^2 effective), a subset only a few,

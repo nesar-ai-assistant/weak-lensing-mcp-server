@@ -21,10 +21,10 @@ PLANCK18_S8 = {"mean": 0.832, "sigma": 0.013,
 DATASETS: dict[str, dict] = {
     "des_y3": {
         "title": "DES Year 3 cosmic shear + 3x2pt (MagLim lenses; redMaGiC alternative)",
-        "products": {"tier1": [],
-                     "tier2": ["xip", "xim", "gammat", "wtheta", "nz_source", "nz_lens", "covariance"],
-                     "tier3": ["chains (~30: 1x2pt/2x2pt/3x2pt, LCDM/wCDM, +Planck)"]},
-        "tier1_note": "The Y3 Metacalibration shape catalogue is public (des.ncsa.illinois.edu/releases/y3a2/"
+        "products": {"catalog": [],
+                     "summary_statistic": ["xip", "xim", "gammat", "wtheta", "nz_source", "nz_lens", "covariance"],
+                     "published_result": ["chains (~30: 1x2pt/2x2pt/3x2pt, LCDM/wCDM, +Planck)"]},
+        "catalog_note": "The Y3 Metacalibration shape catalogue is public (des.ncsa.illinois.edu/releases/y3a2/"
                       "Y3key-catalogs) but only as DESY3_metacal_v03-004.h5 = 312 GB (plus 27 GB index cat, "
                       "37 GB SOMPZ) at desdr-server.ncsa.illinois.edu/despublic/y3a2_files/y3kp_cats/, HDF5 "
                       "with no subset service (verified listing 2026-11-04). Not fetched; use kids_1000.",
@@ -63,10 +63,10 @@ DATASETS: dict[str, dict] = {
     },
     "kids_1000": {
         "title": "KiDS-1000 cosmic shear (Asgari et al. 2021): COSEBIs, band powers, xi+-",
-        "products": {"tier1": ["gold WL shear catalogue (21,262,011 galaxies, 1006 tiles; subsets by tile / "
+        "products": {"catalog": ["gold WL shear catalogue (21,262,011 galaxies, 1006 tiles; subsets by tile / "
                                "patch / RA-Dec box / tomographic bin / row limit via HTTP Range reads)"],
-                     "tier2": ["xip", "xim", "cosebis", "bandpowers", "nz_source", "covariance"],
-                     "tier3": ["MultiNest chains for each statistic"]},
+                     "summary_statistic": ["xip", "xim", "cosebis", "bandpowers", "nz_source", "covariance"],
+                     "published_result": ["MultiNest chains for each statistic"]},
         "access": "download (release tarball 17 MB; shear catalogue 17.7 GB FITS read as Range subsets)",
         "shear_catalog": {
             "url": "https://kids.strw.leidenuniv.nl/DR4/data_files/KiDS_DR4.1_ugriZYJHKs_SOM_gold_WL_cat.fits",
@@ -101,11 +101,11 @@ DATASETS: dict[str, dict] = {
     },
     "kids_legacy": {
         "title": "KiDS-Legacy cosmic shear (Wright et al. 2025): COSEBIs, band powers, xi+-",
-        "products": {"tier1": [],
-                     "tier2": ["xip", "xim", "cosebis", "cosebis_b", "bandpowers", "bandpowers_b", "nz_source",
+        "products": {"catalog": [],
+                     "summary_statistic": ["xip", "xim", "cosebis", "cosebis_b", "bandpowers", "bandpowers_b", "nz_source",
                                "covariance"],
-                     "tier3": ["Nautilus chains (+ cosebis_plus_external)"]},
-        "tier1_note": "The KiDS-Legacy (DR5) shear catalogue is not linked for public download on the KiDS "
+                     "published_result": ["Nautilus chains (+ cosebis_plus_external)"]},
+        "catalog_note": "The KiDS-Legacy (DR5) shear catalogue is not linked for public download on the KiDS "
                       "science-data pages as of 2026-11-04; use kids_1000 for catalogue-level work.",
         "access": "download",
         "statistics": {"xip": "xi_+ (6 bins, 21 pairs x 9 angles)", "xim": "xi_-",
@@ -129,10 +129,10 @@ DATASETS: dict[str, dict] = {
     },
     "hsc_y3": {
         "title": "HSC Year 3 cosmic shear: real-space xi+- (Li+2023) and Fourier C_ell (Dalal+2023)",
-        "products": {"tier1": [],
-                     "tier2": ["xip", "xim", "cl_ee", "nz_source", "covariance"],
-                     "tier3": ["chains (credentialed)"]},
-        "tier1_note": "The HSC Y3 shape catalogue needs an HSC-SSP account (hsc-release.mtk.nao.ac.jp returns "
+        "products": {"catalog": [],
+                     "summary_statistic": ["xip", "xim", "cl_ee", "nz_source", "covariance"],
+                     "published_result": ["chains (credentialed)"]},
+        "catalog_note": "The HSC Y3 shape catalogue needs an HSC-SSP account (hsc-release.mtk.nao.ac.jp returns "
                       "HTTP 401); not fetched by this server.",
         "access": "download (real-space FITS 0.45 MB, Fourier SACC 22 MB); chains credentialed",
         "statistics": {"xip": "xi_+ (4 bins, scale-cut, 130 points)", "xim": "xi_- (100 points)",
@@ -155,7 +155,7 @@ DATASETS: dict[str, dict] = {
     },
 }
 
-# TIER 3 - published headline S8 values, COMPARISON ONLY (compare_s8_with_published when a chain is not
+# Published headline S8 values, for comparison only (compare_s8_with_published when a chain is not
 # public or not yet fetched). Asymmetric errors as (plus, minus).
 PUBLISHED_S8: dict[str, dict] = {
     "DES Y3 3x2pt": {"S8": 0.776, "plus": 0.017, "minus": 0.017,

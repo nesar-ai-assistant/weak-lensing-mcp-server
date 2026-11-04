@@ -24,7 +24,7 @@ convention matched by the hep-genesis harness.
    `collect_dispatched_job(record=...)`.
 
 ## This server's kernels
-- `catalogs.kernels.shear_correlation` (used by `measure_shear_correlation`, tier 1 -> 2):
+- `catalogs.kernels.shear_correlation` (used by `measure_shear_correlation`, from shear catalogue to xi+-):
   args `{"catalog_file": <slim FITS from fetch_shear_catalog, staged into the job cwd>,
   "bin_pairs": [[1,1],[1,2],...], "m_bias": {"1": -0.009, ...}, "min_sep": 0.5, "max_sep": 300,
   "nbins": 9, "bin_slop": 0.05, "remove_c": true, "npatch": 0, "out_csv": "xipm_measured.csv"}`;

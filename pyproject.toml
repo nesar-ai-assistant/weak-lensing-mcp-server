@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "weak-lensing-mcp-server"
 version = "0.2.0"
-description = "MCP server for public weak-lensing data (tier 1 KiDS-1000 shear catalogue subsets; tier 2 data vectors; tier 3 chains): DES Y3 (Y6 pending), KiDS-1000, KiDS-Legacy, HSC Y3 cosmic shear / 3x2pt data vectors, n(z), covariances and chains"
+description = "MCP server for public weak-lensing data (KiDS-1000 shear catalogue subsets; data vectors; published chains for comparison): DES Y3 (Y6 pending), KiDS-1000, KiDS-Legacy, HSC Y3 cosmic shear / 3x2pt data vectors, n(z), covariances and chains"
 readme = "README.md"
 requires-python = ">=3.11"
 dependencies = [

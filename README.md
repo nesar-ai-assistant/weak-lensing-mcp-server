@@ -11,7 +11,7 @@ It is part of the cosmo-*-mcp family, built from `cosmo-mcp-template`.
 Analyses are built on tier 1 and tier 2. Tier 3 is for comparison only and is never fed in as data or as a prior.
 | dataset | tier 1 (catalogue) | tier 2 (summary statistics + cov) | tier 3 (comparison only) | access |
 |---|---|---|---|---|
-| kids_1000 | gold WL shear catalogue, 21,262,011 galaxies / 1006 deg^2 (Giblin+21): ra, dec, e1, e2, weight, z_B, mag, SNR, PSF e | xi+-, COSEBIs, band powers, SOM n(z), cov | MultiNest chains (xipm / COSEBIs / bp) | catalogue: 17.7 GB FITS read by HTTP Range as subsets (tile, N/S patch, RA-Dec box, tomo bin, row limit); release tarball 50 MB |
+| kids_1000 | gold WL shear catalogue, 21,262,011 galaxies / 1006 deg^2 (Giblin+21): ra, dec, e1, e2, weight, z_B, mag, SNR, PSF e | xi+-, COSEBIs, band powers, SOM n(z), cov | MultiNest chains (xipm / COSEBIs / bp) | catalogue: 17.7 GB FITS read by HTTP Range as subsets (tile, N/S patch, RA-Dec box, tomo bin, row limit); release tarball 17 MB |
 | des_y3 | Metacal shape catalogue public but 312 GB HDF5 with no subset service: **not fetched** | xi+-, gamma_t, w(theta), n(z), cov | ~30 chains | download (28 MB FITS) |
 | kids_legacy | shear catalogue not publicly linked (2026-11-04) | xi+-, COSEBIs E/B, band powers E/B, n(z), cov | Nautilus chains | download (131 MB) |
 | hsc_y3 | shape catalogue needs an HSC-SSP account (HTTP 401) | real xi+-, Fourier C_ell, n(z), cov | chains (credentialed) | download (CSL mirror) |

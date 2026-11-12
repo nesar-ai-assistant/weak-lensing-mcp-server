@@ -221,8 +221,14 @@ def measure_shear_correlation(
     npatch: Annotated[int, Field(ge=0, le=200, description="Jackknife patches for errors (0 = shape-noise "
                                                            "only; needs >~ 4 deg^2 for >= 10 patches).")] = 0,
     bin_slop: Annotated[float, Field(ge=0, le=1, description="treecorr bin_slop (accuracy vs speed).")] = 0.05,
+    compute_bmodes: Annotated[bool, Field(description="Also compute aperture-mass E/B modes <M_ap^2>, <M_x^2> "
+                                                      "(treecorr calculateMapSq, Crittenden filter) and the chi2 "
+                                                      "of <M_x^2> against zero (B-mode null test).")] = False,
+    bmode_nbins: Annotated[int, Field(ge=10, le=200, description="Fine log theta bins for the M_ap conversion.")] = 40,
+    max_galaxies_per_bin: Annotated[int | None, Field(ge=100, description="Random (seeded) subsample per "
+                                                      "tomographic bin to keep runtime sane.")] = None,
 ) -> ArtifactResult:
-    """Measure xi+(theta) and xi-(theta) per tomographic bin pair from a shear catalogue.
+    """Measure xi+(theta) and xi-(theta) per tomographic bin pair from a shear catalogue (optional B-mode test).
 
     Use to turn fetch_shear_catalog output into your own cosmic-shear
     data vector. Weighted treecorr GG correlation with per-bin additive
@@ -234,6 +240,10 @@ def measure_shear_correlation(
     variance; a few deg^2 subset gives a noisy, not unbiased-in-area,
     estimate vs the 1006 deg^2 release. Sanity: theta*xi+ ~ 1e-4 x
     (1-5) arcmin at 10 arcmin for z~0.5-1 pairs (Asgari+21 Fig. 1).
+    compute_bmodes=True adds *_mapsq_bmodes.csv (bin1, bin2, R_arcmin, mapsq,
+    mapsq_err, mxsq, mxsq_err, mapmx) and reports chi2(<M_x^2> = 0) per
+    pair and total (diagonal errors; shape noise only) - a B-mode null
+    test: PTE > ~0.05 means no detected B modes.
     Heavy: with set_dispatch it runs catalogs.kernels.shear_correlation on the facility.
     """
     import pandas as pd
@@ -246,6 +256,8 @@ def measure_shear_correlation(
     m = {str(b): (SC["m_bias"][b - 1] if apply_m_bias else 0.0) for b in range(1, 6)}
     args = dict(bin_pairs=pairs, m_bias=m, min_sep=min_sep, max_sep=max_sep, nbins=nbins, bin_slop=bin_slop,
                 remove_c=remove_c, npatch=npatch)
+    if compute_bmodes or max_galaxies_per_bin:
+        args.update(compute_bmodes=compute_bmodes, bmode_nbins=bmode_nbins, max_galaxies_per_bin=max_galaxies_per_bin)
     site = remote_site()
     if site:
         res = run_kernel("catalogs.kernels.shear_correlation",
@@ -253,7 +265,7 @@ def measure_shear_correlation(
                           "subset": _subset_spec(cat)},
                          pip_deps=DISPATCH_KERNELS["shear_correlation"]["pip_deps"], duration=1800)
         payload, computed_on = res["result"], res.get("host", site)
-        info, rows = {"bins": payload["bins"]}, payload["rows"]
+        info, rows = {"bins": payload["bins"], "bmodes": payload.get("bmodes")}, payload["rows"]
     else:
         out_all = kernels.shear_correlation_arrays(cat, num_threads=None, **args)
         info, rows, computed_on = out_all[0], out_all[1:], "local"
@@ -268,7 +280,17 @@ def measure_shear_correlation(
         tidy.to_csv(p, index=False)
         files.append(p)
     js = out / f"{stem}_xipm_measured.json"
-    js.write_text(json.dumps({"bins": info["bins"], "settings": args, "computed_on": computed_on}, indent=2))
+    bm = info.get("bmodes")
+    extra, bmsg = {}, ""
+    if bm:
+        bcsv = out / f"{stem}_mapsq_bmodes.csv"
+        pd.DataFrame(bm["rows"]).to_csv(bcsv, index=False)
+        files.append(bcsv)
+        extra = {"bmodes": {k: v for k, v in bm.items() if k != "rows"}}
+        bmsg = (f" B-mode null test: chi2(<M_x^2>=0) = {bm['chi2_mx_total']:.1f} / {bm['ndof_total']} "
+                f"(PTE {bm['pte_total']}).")
+    js.write_text(json.dumps({"bins": info["bins"], "settings": args, "computed_on": computed_on, **extra},
+                             indent=2))
     files.append(js)
     near10 = {}
     for (i, j), g in df.groupby(["bin1", "bin2"]):
@@ -276,8 +298,8 @@ def measure_shear_correlation(
         near10[f"{i}{j}"] = {"theta": round(float(g.theta_arcmin.values[k]), 2), "xip": float(g.xip.values[k]),
                              "xip_err": float(g.xip_err.values[k])}
     return ok(f"Measured xi+/xi- for {len(pairs)} bin pair(s) x {nbins} theta bins ({computed_on}); "
-              f"xi+ near 10 arcmin: " + ", ".join(f"{k}: {v['xip']:.2e}+/-{v['xip_err']:.1e}" for k, v in near10.items()),
-              files, bin_pairs=pairs, xip_near_10arcmin=near10, per_bin=info["bins"], computed_on=computed_on,
+              f"xi+ near 10 arcmin: " + ", ".join(f"{k}: {v['xip']:.2e}+/-{v['xip_err']:.1e}" for k, v in near10.items())
+              + bmsg, files, **extra, bin_pairs=pairs, xip_near_10arcmin=near10, per_bin=info["bins"], computed_on=computed_on,
               m_bias_applied=m if apply_m_bias else None, c_removed=remove_c,
               error_kind="jackknife" if npatch >= 2 else "shape noise only (no cosmic variance)")
 

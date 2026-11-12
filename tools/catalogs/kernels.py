@@ -287,13 +287,23 @@ def load_catalog(path: str) -> dict:
 
 def shear_correlation_arrays(cat: dict, bin_pairs: list, m_bias: dict | None = None, min_sep: float = 0.5,
                              max_sep: float = 300.0, nbins: int = 9, bin_slop: float = 0.05,
-                             remove_c: bool = True, num_threads: int | None = None, npatch: int = 0) -> list[dict]:
+                             remove_c: bool = True, num_threads: int | None = None, npatch: int = 0,
+                             compute_bmodes: bool = False, bmode_nbins: int = 40,
+                             max_galaxies_per_bin: int | None = None, seed: int = 0) -> list[dict]:
     """xi+/xi- per tomographic bin pair with weights, m-correction and c-term removal (treecorr).
 
     Per bin: c_k = weighted mean of e_k (removed when remove_c); the
     multiplicative bias enters as xi -> xi / ((1+m_i)(1+m_j)) - KiDS-1000
     practice for a per-bin scalar m. Errors are treecorr shape-noise
     (varxip) or jackknife over ``npatch`` k-means patches when npatch >= 2.
+
+    compute_bmodes: also run a finely log-binned GG correlation (bmode_nbins
+    bins over [min_sep, max_sep]) per pair and convert it with treecorr's
+    calculateMapSq (Crittenden filter) to <M_ap^2>(R) (E mode) and
+    <M_x^2>(R) (B mode) with variances; stored in info["bmodes"] with
+    chi2 of M_x^2 against zero (diagonal variances). R runs from
+    2 min_sep to max_sep / 4 so the filter integral is not truncated badly.
+    max_galaxies_per_bin: random subsample (seeded) per tomographic bin.
     """
     import treecorr
 
@@ -306,6 +316,11 @@ def shear_correlation_arrays(cat: dict, bin_pairs: list, m_bias: dict | None = N
         s = tb == b
         if s.sum() < 10:
             raise ValueError(f"tomographic bin {b} has only {int(s.sum())} galaxies in this catalogue")
+        if max_galaxies_per_bin and s.sum() > max_galaxies_per_bin:
+            idx = np.flatnonzero(s)
+            keep = np.random.default_rng(seed + b).choice(idx, size=int(max_galaxies_per_bin), replace=False)
+            s = np.zeros_like(s)
+            s[keep] = True
         w = np.asarray(cat["weight"], float)[s]
         e1, e2 = np.asarray(cat["e1"], float)[s], np.asarray(cat["e2"], float)[s]
         c1, c2 = (float(np.average(e1, weights=w)), float(np.average(e2, weights=w))) if remove_c else (0.0, 0.0)
@@ -344,12 +359,55 @@ def shear_correlation_arrays(cat: dict, bin_pairs: list, m_bias: dict | None = N
                          "xim": float(gg.xim[k] * corr), "xip_err": float(ep[k] * corr),
                          "xim_err": float(em[k] * corr), "xip_im": float(gg.xip_im[k] * corr),
                          "npairs": float(gg.npairs[k]), "weight": float(gg.weight[k])})
-    return [{"bins": {str(k): v for k, v in info.items()}}] + rows
+    head = {"bins": {str(k): v for k, v in info.items()}}
+    if compute_bmodes:
+        head["bmodes"] = aperture_mass_bmodes(cats, info, bin_pairs, min_sep, max_sep, bmode_nbins, bin_slop,
+                                              num_threads)
+    return [head] + rows
+
+
+def aperture_mass_bmodes(cats: dict, info: dict, bin_pairs: list, min_sep: float, max_sep: float,
+                         nbins: int = 40, bin_slop: float = 0.05, num_threads: int | None = None) -> dict:
+    """<M_ap^2>, <M_x^2> (Crittenden et al. 2002 filter) per bin pair via treecorr calculateMapSq.
+
+    Returns {"rows": [...], "per_pair": {"i-j": {"chi2_mx": .., "ndof": .., "pte": ..}}, "chi2_mx_total",
+    "ndof_total", "pte_total"}. chi2 uses diagonal variances only (neighbouring R are correlated, so the PTE
+    is indicative); m-correction is applied as for xi.
+    """
+    import treecorr
+    from scipy.stats import chi2 as chi2_dist
+
+    rows, per = [], {}
+    R = np.geomspace(2 * min_sep, max_sep / 4.0, 8)
+    for i, j in bin_pairs:
+        i, j = int(i), int(j)
+        gg = treecorr.GGCorrelation(min_sep=min_sep, max_sep=max_sep, nbins=nbins, sep_units="arcmin",
+                                    bin_slop=bin_slop, num_threads=num_threads)
+        gg.process(cats[i]) if i == j else gg.process(cats[i], cats[j])
+        corr = 1.0 / ((1.0 + info[i]["m"]) * (1.0 + info[j]["m"]))
+        mapsq, mapsq_im, mxsq, mxsq_im, varmapsq = gg.calculateMapSq(R=R)
+        mapsq, mxsq, var = mapsq * corr, mxsq * corr, varmapsq * corr ** 2
+        err = np.sqrt(np.clip(var, 0, None))
+        good = err > 0
+        c2 = float(np.sum((mxsq[good] / err[good]) ** 2))
+        per[f"{i}-{j}"] = {"chi2_mx": round(c2, 2), "ndof": int(good.sum()),
+                           "pte": round(float(chi2_dist.sf(c2, int(good.sum()))), 4) if good.any() else None}
+        for k in range(len(R)):
+            rows.append({"bin1": i, "bin2": j, "R_arcmin": float(R[k]), "mapsq": float(mapsq[k]),
+                         "mapsq_err": float(err[k]), "mxsq": float(mxsq[k]), "mxsq_err": float(err[k]),
+                         "mapmx": float(mapsq_im[k] * corr)})
+    tot = sum(v["chi2_mx"] for v in per.values())
+    nd = sum(v["ndof"] for v in per.values())
+    return {"rows": rows, "per_pair": per, "chi2_mx_total": round(tot, 2), "ndof_total": nd,
+            "pte_total": round(float(chi2_dist.sf(tot, nd)), 4) if nd else None,
+            "filter": "Crittenden et al. 2002 (treecorr calculateMapSq)"}
 
 
 def shear_correlation(catalog_file: str, bin_pairs: list, m_bias: dict | None = None, min_sep: float = 0.5,
                       max_sep: float = 300.0, nbins: int = 9, bin_slop: float = 0.05, remove_c: bool = True,
-                      npatch: int = 0, out_csv: str = "xipm_measured.csv", subset: dict | None = None) -> dict:
+                      npatch: int = 0, out_csv: str = "xipm_measured.csv", subset: dict | None = None,
+                      compute_bmodes: bool = False, bmode_nbins: int = 40,
+                      max_galaxies_per_bin: int | None = None) -> dict:
     """Dispatch entry point: catalogue FITS -> xi+/xi- CSV in cwd + JSON summary.
 
     If ``catalog_file`` is not present in the job cwd and ``subset`` is given
@@ -364,7 +422,8 @@ def shear_correlation(catalog_file: str, bin_pairs: list, m_bias: dict | None = 
             raise FileNotFoundError(f"{catalog_file} not in the job directory and no subset spec given")
         kids1000_subset(out_file=catalog_file, **subset)
     res = shear_correlation_arrays(load_catalog(catalog_file), bin_pairs, m_bias, min_sep, max_sep, nbins,
-                                   bin_slop, remove_c, None, npatch)
+                                   bin_slop, remove_c, None, npatch, compute_bmodes=compute_bmodes,
+                                   bmode_nbins=bmode_nbins, max_galaxies_per_bin=max_galaxies_per_bin)
     info, rows = res[0], res[1:]
     with open(out_csv, "w", newline="") as fh:
         wr = csv.DictWriter(fh, fieldnames=list(rows[0]))

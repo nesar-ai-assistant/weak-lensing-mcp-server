@@ -68,10 +68,19 @@ def test_compare_s8_published_tensions(tmp_path):
     assert PUBLISHED_S8["HSC Y3 real space"]["S8"] == 0.769
 
 
-def test_registry_and_unreleased():
-    assert DATASETS["des_y6"]["access"] == "unreleased"
-    with pytest.raises(RuntimeError, match="not"):
-        io.check_dataset("des_y6")
+def test_registry_and_y6_datavector_placeholder(tmp_path):
+    from tools import registry
+    from tools.datavectors import fetch_wl_datavector
+    y6 = DATASETS["des_y6"]
+    assert y6["datavector_status"]["available"] is False and registry.DES_Y6_DATAVECTORS_PUBLIC is False
+    assert "3x2pt_lcdm" in y6["chains"] and y6["products"]["published_result"]
+    with pytest.raises(io.DataNotPublicError, match="not yet public"):
+        io.load_statistic("des_y6", "xip")
+    with pytest.raises(io.DataNotPublicError, match="releases/y6a2"):
+        io.load_nz("des_y6")
+    r = fetch_wl_datavector("des_y6", "xip", str(tmp_path))
+    assert r.metadata["available"] is False and r.files == [] and "not yet public" in r.message
+    assert "DES_Y6_DATAVECTORS_PUBLIC" in r.metadata["enable_hint"]
     for k in ("des_y3", "kids_1000", "kids_legacy", "hsc_y3"):
         assert set(io.STATISTICS[k]) and DATASETS[k]["citation"]
 
@@ -136,3 +145,61 @@ def test_hsc_y3_real_and_fourier(tmp_path):
     assert fetch_wl_datavector("hsc_y3", "xip", str(tmp_path)).metadata["n_bin_pairs"] == 10
     nz = io.load_nz("hsc_y3")
     assert len(nz["bins"]) == 4
+
+
+def _write_nautilus(path, n=30000, seed=2, extra_cols=()):
+    rng = np.random.default_rng(seed)
+    om = rng.normal(0.32, 0.02, n)
+    S8 = rng.normal(0.79, 0.011, n)
+    s8 = S8 / np.sqrt(om / 0.3)
+    lw = np.zeros(n)
+    lw[:50] = -np.inf  # non-finite log weights must be dropped
+    names = ["cosmological_parameters--omega_m", "cosmological_parameters--h0", *extra_cols,
+             "COSMOLOGICAL_PARAMETERS--SIGMA_8", "COSMOLOGICAL_PARAMETERS--S_8", "log_weight", "prior", "post"]
+    cols = [om, np.full(n, 0.68)] + [rng.normal(-1, 0.1, n) for _ in extra_cols] + [s8, S8, lw, np.zeros(n),
+                                                                                     np.zeros(n)]
+    with open(path, "w") as fh:
+        fh.write("#" + "\t".join(names) + "\n#sampler=nautilus\n")
+        np.savetxt(fh, np.column_stack(cols))
+        fh.write("#log_z=1.0\n")
+
+
+def test_fetch_des_y6_chain_offline(tmp_path, monkeypatch):
+    """Nautilus layout (log_weight, -inf rows) and csislike layout ('weights') both parse from the header."""
+    monkeypatch.setenv("COSMO_MCP_DATA", str(tmp_path / "cache"))
+    from tools.chains import fetch_des_y6_chain
+    from tools.common import data_cache_dir
+    from tools.registry import DES_Y6_CHAIN_FILES
+    d = data_cache_dir() / "des_y6"
+    d.mkdir(parents=True)
+    _write_nautilus(d / DES_Y6_CHAIN_FILES["3x2pt_wcdm"]["file"], extra_cols=("cosmological_parameters--w",))
+    r = fetch_des_y6_chain(str(tmp_path), "3x2pt_wcdm")
+    P = r.metadata["params"]
+    assert r.metadata["data_kind"] == "published_result" and "comparison_only" in r.metadata
+    assert r.metadata["n_samples"] == 30000 - 50
+    assert abs(P["S_8"]["mean"] - 0.79) < 0.002 and abs(P["omega_m"]["std"] - 0.02) < 0.002
+    assert abs(P["w"]["mean"] + 1) < 0.01
+    assert any(f.endswith("_S8_om.png") for f in r.files) and any(f.endswith(".json") for f in r.files)
+    rng = np.random.default_rng(3)
+    om, s8 = rng.normal(0.31, 0.01, 5000), rng.normal(0.8, 0.01, 5000)
+    with open(d / DES_Y6_CHAIN_FILES["3x2pt_cmb_lcdm"]["file"], "w") as fh:
+        fh.write("#cosmological_parameters--omega_m\tCOSMOLOGICAL_PARAMETERS--SIGMA_8\tweights\tpost\n")
+        np.savetxt(fh, np.c_[om, s8, rng.integers(1, 6, 5000), np.zeros(5000)])
+    r2 = fetch_des_y6_chain(str(tmp_path), "3x2pt_cmb_lcdm", plot=False)
+    exp = np.average(s8 * np.sqrt(om / 0.3), weights=np.loadtxt(d / DES_Y6_CHAIN_FILES["3x2pt_cmb_lcdm"]["file"])[:, 2])
+    assert abs(r2.metadata["params"]["S_8"]["mean"] - exp) < 1e-3
+    with pytest.raises(RuntimeError, match="allow_large"):
+        fetch_des_y6_chain(str(tmp_path), "3x2pt_nonlin_wcdm")
+
+
+def test_published_s8_has_des_y6():
+    assert PUBLISHED_S8["DES Y6 3x2pt"]["S8"] == 0.789 and PUBLISHED_S8["DES Y6 3x2pt"]["plus"] == 0.012
+
+
+@pytest.mark.network
+def test_des_y6_fiducial_3x2pt_s8(tmp_path):
+    from tools.chains import fetch_des_y6_chain
+    r = fetch_des_y6_chain(str(tmp_path), "3x2pt_lcdm", plot=False)
+    P = r.metadata["params"]
+    assert abs(P["S_8"]["mean"] - 0.789) < 0.003 and abs(P["S_8"]["std"] - 0.012) < 0.002
+    assert abs(P["omega_m"]["mean"] - 0.325) < 0.01 and abs(P["sigma_8"]["mean"] - 0.759) < 0.01

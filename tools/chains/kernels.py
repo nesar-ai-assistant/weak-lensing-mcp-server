@@ -23,7 +23,11 @@ def parse_cosmosis_text(text_or_path) -> tuple[list[str], np.ndarray]:
     with open(p) as fh:
         header = fh.readline().lstrip("#").strip()
     cols = header.split("\t") if "\t" in header else header.split()
-    data = np.loadtxt(p, comments="#", ndmin=2)
+    try:  # pandas' C parser is ~10x faster than loadtxt on the 100-400 MB DES Y6 chains
+        import pandas as pd
+        data = pd.read_csv(p, comment="#", sep=r"\s+", header=None, dtype=float, engine="c").to_numpy()
+    except ImportError:
+        data = np.loadtxt(p, comments="#", ndmin=2)
     if data.shape[1] != len(cols):
         raise ValueError(f"{p.name}: {len(cols)} header columns but {data.shape[1]} data columns")
     return [c.lower() for c in cols], data
@@ -38,7 +42,7 @@ def _find(cols: list[str], *cands: str) -> int | None:
 
 def standard_columns(cols: list[str], data: np.ndarray) -> dict[str, np.ndarray]:
     """Extract weight, Om, sigma8, S8 (derived when missing/NaN), h, w from a CosmoSIS chain."""
-    iw = _find(cols, "weight")
+    iw = _find(cols, "weight", "weights")  # 'weights' = multiplicities in DES Y6 csislike chains
     if iw is not None:
         w = data[:, iw].astype(float)
     else:
@@ -46,8 +50,9 @@ def standard_columns(cols: list[str], data: np.ndarray) -> dict[str, np.ndarray]
         if il is None:
             w = np.ones(len(data))
         else:
-            lw = data[:, il]
-            w = np.exp(lw - np.nanmax(lw[np.isfinite(lw)]))
+            lw = data[:, il]  # natural log (Nautilus); non-finite -> weight 0 (dropped below)
+            fin = np.isfinite(lw)
+            w = np.where(fin, np.exp(np.where(fin, lw, 0.0) - np.max(lw[fin])), 0.0)
     om = data[:, _find(cols, "cosmological_parameters--omega_m")]
     i8 = _find(cols, "cosmological_parameters--sigma_8")
     if i8 is None:
@@ -61,9 +66,12 @@ def standard_columns(cols: list[str], data: np.ndarray) -> dict[str, np.ndarray]
     ih = _find(cols, "cosmological_parameters--h0")
     if ih is not None:
         out["h0"] = data[:, ih]
-    iwz = _find(cols, "cosmological_parameters--w")
+    iwz = _find(cols, "cosmological_parameters--w", "cosmological_parameters--w0")
     if iwz is not None:
         out["w"] = data[:, iwz]
+    iwa = _find(cols, "cosmological_parameters--wa")
+    if iwa is not None:
+        out["wa"] = data[:, iwa]
     ip = _find(cols, "post")
     if ip is not None:
         out["post"] = data[:, ip]
@@ -96,7 +104,7 @@ def summarize_columns(cols: dict[str, np.ndarray], params: list[str] | None = No
     w = np.asarray(cols["weight"], float)
     neff = float(w.sum() ** 2 / np.sum(w ** 2))
     res = {"n_samples": int(len(w)), "n_eff": round(neff, 1), "params": {}}
-    for p in params or [k for k in ("S_8", "omega_m", "sigma_8", "h0", "w") if k in cols]:
+    for p in params or [k for k in ("S_8", "omega_m", "sigma_8", "h0", "w", "wa") if k in cols]:
         x = np.asarray(cols[p], float)
         m = np.isfinite(x)
         x, ww = x[m], w[m]

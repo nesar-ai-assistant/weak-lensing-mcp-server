@@ -134,3 +134,17 @@ def test_fetch_one_kids1000_tile(tmp_path):
     kernels.kids1000_subset(out_file=str(tmp_path / "rebuilt.fits"), **_subset_spec(cat))
     t2 = Table.read(tmp_path / "rebuilt.fits")
     assert len(t2) == len(t) and np.array_equal(t2["e1"], t["e1"]) and np.array_equal(t2["ra"], t["ra"])
+
+
+def test_bmodes_null_on_noise_and_subsample(tmp_path):
+    """Pure shape noise: <M_x^2> consistent with zero; CSV + chi2 written; subsampling honoured."""
+    path = _synthetic_catalog(tmp_path / "cat.fits", n=40000)
+    r = measure_shear_correlation(path, str(tmp_path), bin_pairs=[[3, 3]], min_sep=1, max_sep=60, nbins=4,
+                                  compute_bmodes=True, bmode_nbins=20, max_galaxies_per_bin=8000)
+    bm = r.metadata["bmodes"]
+    assert bm["ndof_total"] == 8 and bm["pte_total"] > 0.001
+    assert r.metadata["per_bin"]["3"]["n"] == 8000
+    import pandas as pd
+    df = pd.read_csv(next(f for f in r.files if f.endswith("_mapsq_bmodes.csv")))
+    assert {"R_arcmin", "mapsq", "mxsq", "mxsq_err"} <= set(df.columns) and len(df) == 8
+    assert "B-mode null test" in r.message

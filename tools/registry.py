@@ -15,6 +15,45 @@ KIDS1000_TGZ = "https://kids.strw.leidenuniv.nl/DR4/data_files/KiDS1000_cosmic_s
 KIDS_LEGACY_TGZ = "https://kids.strw.leidenuniv.nl/sci_data/KiDS_Legacy_cosmic_shear_data_release.tar.gz"
 CSL_RAW = "https://raw.githubusercontent.com/cosmosis-developers/cosmosis-standard-library/main/likelihood/"
 
+DES_Y6_CHAINS = "https://desdr-server.ncsa.illinois.edu/despublic/y6a2_files/y6_key/chains_release/"
+# chain key -> file in DES_Y6_CHAINS, size and content (sizes from HTTP HEAD, 2026-11-12).
+DES_Y6_CHAIN_FILES: dict[str, dict] = {
+    "3x2pt_lcdm": {"file": "fiducial32pt_wolensbin2_nonlin_lcdm_DV0728_R0820.txt", "size_mb": 370,
+                   "desc": "FIDUCIAL 3x2pt LCDM (nonlinear galaxy bias), Nautilus"},
+    "1x2pt_lcdm": {"file": "12pt_wolensbin2_lin_lcdm_DV0723_R0723.txt", "size_mb": 15,
+                   "desc": "cosmic shear only (TATT IA), LCDM, Nautilus"},
+    "1x2pt_nla_lcdm": {"file": "shear_nla_wolensbin2_lcdm_DV0723_R0723.txt", "size_mb": 10,
+                       "desc": "cosmic shear only with NLA intrinsic alignments, LCDM, Nautilus"},
+    "2x2pt_lcdm": {"file": "22pt_wolensbin2_lin_lcdm_DV0723_R0723.txt", "size_mb": 128,
+                   "desc": "2x2pt (gammat + wtheta, linear bias), LCDM, Nautilus"},
+    "3x2pt_linbias_lcdm": {"file": "32pt_wolensbin2_lin_lcdm_DV0723_R0723.txt", "size_mb": 144,
+                           "desc": "3x2pt with linear galaxy bias, LCDM, Nautilus"},
+    "3x2pt_fixmnu_lcdm": {"file": "fixmnu_32pt_wolensbin2_lin_lcdm_DV0728_R0909.txt", "size_mb": 76,
+                          "desc": "3x2pt, fixed neutrino mass, LCDM, Nautilus"},
+    "3x2pt_wcdm": {"file": "fiducial32pt_wolensbin2_lin_wcdm_DV0723_R0723.txt", "size_mb": 388,
+                   "desc": "3x2pt wCDM (linear bias), Nautilus"},
+    "3x2pt_nonlin_wcdm": {"file": "fiducial32pt_wolensbin2_nonlin_wcdm_DV0728_R0820.txt", "size_mb": 4486,
+                          "desc": "3x2pt wCDM nonlinear bias - 4.5 GB, only on explicit request"},
+    "cmb_lcdm": {"file": "fiducial_cmb_tp_external_R1006.txt", "size_mb": 12,
+                 "desc": "external CMB (Planck/ACT/SPT T+P) alone, LCDM, Nautilus"},
+    "3x2pt_cmb_lcdm": {"file": "chain_des_3x2pt_cmb_t_p_chain_csislike.txt", "size_mb": 2.5,
+                       "desc": "DES Y6 3x2pt + CMB T+P, LCDM (emcee resample, 'csislike')"},
+    "3x2pt_bao_sn_clusters_lcdm": {
+        "file": "chain_des_3x2pt_des_bao_no_desi_des_sn_desi_dr2_bao_spt_clusters_chain_csislike.txt",
+        "size_mb": 6.3, "desc": "3x2pt + DES BAO + DES SN + DESI DR2 BAO + SPT clusters, LCDM (csislike)"},
+    "3x2pt_cmb_wcdm": {"file": "chain_des_3x2pt_wcdm_cmb_t_p_wcdm_chain_csislike.txt", "size_mb": 10.8,
+                       "desc": "3x2pt + CMB T+P, wCDM (csislike)"},
+    "3x2pt_bao_bbn_lcdm": {"file": "chain_des_y6_3x2pt_des_y6_bao_bbn_prior_chain_csislike.txt", "size_mb": 5.8,
+                           "desc": "3x2pt + DES Y6 BAO + BBN prior, LCDM (csislike)"},
+}
+
+# DES Y6 2pt data vectors / covariance: NOT public yet (2026-11-12). One-line switch: flip to True and
+# set DES_Y6_DV_URL to the released CosmoSIS 2pt FITS; fetch_wl_datavector('des_y6', ...) then works like des_y3.
+DES_Y6_DATAVECTORS_PUBLIC = False
+DES_Y6_DV_URL = ""
+DES_Y6_DV_NOTICE = ("DES Y6 2pt data vectors/covariance not yet public; check https://des.ncsa.illinois.edu/releases/y6a2 "
+                    "(the Y6 published chains ARE public: fetch_des_y6_chain).")
+
 PLANCK18_S8 = {"mean": 0.832, "sigma": 0.013,
                "citation": "Planck Collaboration 2020, A&A 641, A6 (TT,TE,EE+lowE+lensing)"}
 
@@ -51,15 +90,36 @@ DATASETS: dict[str, dict] = {
                   "plot_covariance", "compute_signal_to_noise", "fetch_wl_chain", "analyze_wl_chain"],
     },
     "des_y6": {
-        "title": "DES Year 6 3x2pt (key products not yet public)",
-        "products": {},
-        "access": "unreleased",
-        "urls": ["https://desdr-server.ncsa.illinois.edu/despublic/y6a2_files/y6key_products/"],
-        "note": "As of 2026-11-04 the y6key_products/ directory (and final_version/, chains_release/) "
-                "lists no files. Y6 papers are out (arXiv:2601.14559 etc.) but the data vectors and chains "
-                "are not downloadable. Tools raise a clear error; re-check the URL above.",
-        "citation": "DES Collaboration 2026 (Y6 3x2pt, arXiv:2601.14559)",
-        "tools": [],
+        "title": "DES Year 6 3x2pt: published chains (2pt data vectors / covariance not yet public)",
+        "products": {"catalog": [],
+                     "summary_statistic": (["xip", "xim", "gammat", "wtheta", "nz_source", "nz_lens", "covariance"]
+                                           if DES_Y6_DATAVECTORS_PUBLIC else []),
+                     "published_result": ["chains (Nautilus: 1x2pt/2x2pt/3x2pt LCDM/wCDM; emcee 'csislike' "
+                                          "combinations with CMB / BAO / SN / clusters)"]},
+        "access": "download (chains, 2.5 MB - 390 MB each); data vectors not yet public",
+        "chains_base": DES_Y6_CHAINS,
+        "chains": {k: v["file"] for k, v in DES_Y6_CHAIN_FILES.items()},
+        "chain_info": DES_Y6_CHAIN_FILES,
+        "datavector_status": {
+            "product": "DES Y6 2pt data vectors (xi+-, gammat, wtheta), n(z) and covariance",
+            "available": DES_Y6_DATAVECTORS_PUBLIC,
+            "notice": DES_Y6_DV_NOTICE,
+            "enable": "set DES_Y6_DATAVECTORS_PUBLIC = True in tools/registry.py and put the released 2pt "
+                      "FITS URL in DES_Y6_DV_URL (CosmoSIS 2pt FITS layout, as DES Y3).",
+        },
+        "files": {"datavector": DES_Y6_DV_URL},
+        "units": "chains: CosmoSIS text; Nautilus files carry log_weight (natural log), csislike files "
+                 "carry 'weights' (sample multiplicities)",
+        "urls": [DES_Y6_CHAINS, "https://des.ncsa.illinois.edu/releases/y6a2"],
+        "citation": "DES Collaboration 2026, 'Dark Energy Survey Year 6 Results: cosmological constraints from "
+                    "galaxy clustering and weak lensing' (arXiv:2601.14559); 140M source shapes, 9M lenses, "
+                    "~5000 deg^2",
+        "reference_S8": {"3x2pt_lcdm": "0.789 +/- 0.012 (paper; Om = 0.333 +0.023/-0.028)",
+                         "3x2pt_lcdm (this server, chain mean +/- std)": "0.7888 +/- 0.0112, "
+                                                                          "Om = 0.325 +/- 0.023, "
+                                                                          "sigma8 = 0.759 +/- 0.033"},
+        "tools": ["fetch_des_y6_chain", "fetch_wl_chain", "analyze_wl_chain", "plot_s8_om_contours",
+                  "compare_s8_with_published", "fetch_wl_datavector (returns the not-yet-public notice)"],
     },
     "kids_1000": {
         "title": "KiDS-1000 cosmic shear (Asgari et al. 2021): COSEBIs, band powers, xi+-",
@@ -158,6 +218,8 @@ DATASETS: dict[str, dict] = {
 # Published headline S8 values, for comparison only (compare_s8_with_published when a chain is not
 # public or not yet fetched). Asymmetric errors as (plus, minus).
 PUBLISHED_S8: dict[str, dict] = {
+    "DES Y6 3x2pt": {"S8": 0.789, "plus": 0.012, "minus": 0.012,
+                     "ref": "DES Collaboration 2026, arXiv:2601.14559 (Om = 0.333 +0.023/-0.028)"},
     "DES Y3 3x2pt": {"S8": 0.776, "plus": 0.017, "minus": 0.017,
                      "ref": "DES Collaboration 2022, PRD 105, 023520"},
     "DES Y3 cosmic shear": {"S8": 0.759, "plus": 0.025, "minus": 0.023,

@@ -25,11 +25,30 @@ from pathlib import Path
 import numpy as np
 
 from ..common import data_cache_dir, fetch_file, get_cached
+from .. import registry
 from ..registry import DATASETS
+
+
+class DataNotPublicError(RuntimeError):
+    """Raised for products that are registered but not yet publicly released (e.g. DES Y6 2pt)."""
+
+
+def datavectors_available(dataset: str) -> bool:
+    if dataset == "des_y6":
+        return bool(registry.DES_Y6_DATAVECTORS_PUBLIC and registry.DES_Y6_DV_URL)
+    return True
+
+
+def require_datavectors(dataset: str) -> None:
+    if not datavectors_available(dataset):
+        raise DataNotPublicError(registry.DES_Y6_DV_NOTICE)
 
 # statistic -> (file key in DATASETS[ds]["files"], FITS extension or SACC data type)
 STATISTICS: dict[str, dict[str, tuple[str, str]]] = {
     "des_y3": {"xip": ("datavector", "xip"), "xim": ("datavector", "xim"),
+               "gammat": ("datavector", "gammat"), "wtheta": ("datavector", "wtheta")},
+    # DES Y6: same CosmoSIS 2pt FITS layout as Y3 expected; inactive until DES_Y6_DATAVECTORS_PUBLIC = True
+    "des_y6": {"xip": ("datavector", "xip"), "xim": ("datavector", "xim"),
                "gammat": ("datavector", "gammat"), "wtheta": ("datavector", "wtheta")},
     "kids_1000": {"xip": ("xipm", "xiP"), "xim": ("xipm", "xiM"),
                   "cosebis": ("cosebis", "En"), "bandpowers": ("bandpowers", "PeeE")},
@@ -102,7 +121,8 @@ def archive_member(dataset: str, relpath: str) -> Path:
 def product_path(dataset: str, file_key: str) -> Path:
     """Local path of a data-vector file (download / extract as needed)."""
     meta = check_dataset(dataset)
-    rel = meta["files"][file_key]
+    require_datavectors(dataset)
+    rel = registry.DES_Y6_DV_URL if dataset == "des_y6" else meta["files"][file_key]
     if "archive" in meta:
         return archive_member(dataset, rel)
     return download(rel, subdir=dataset)
@@ -189,6 +209,7 @@ def block_slice(dv: dict, ext: str) -> slice:
 def load_statistic(dataset: str, statistic: str) -> tuple[dict, np.ndarray, str]:
     """(block table, its covariance sub-matrix, extension name) for one statistic."""
     check_dataset(dataset)
+    require_datavectors(dataset)
     stats = STATISTICS[dataset]
     if statistic not in stats:
         raise ValueError(f"{dataset} has statistics {list(stats)}; got {statistic!r}")
@@ -201,6 +222,7 @@ def load_statistic(dataset: str, statistic: str) -> tuple[dict, np.ndarray, str]
 def load_nz(dataset: str, sample: str = "source") -> dict:
     """n(z) per tomographic bin: {"z": array, "bins": [array, ...]}."""
     check_dataset(dataset)
+    require_datavectors(dataset)
     if dataset == "hsc_y3":
         if sample != "source":
             raise ValueError("HSC Y3 cosmic shear has source n(z) only")

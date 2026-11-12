@@ -48,10 +48,17 @@ def fetch_wl_datavector(
     compute_signal_to_noise. Data vectors are the published ones (scale
     cuts NOT applied: DES/KiDS files are the full measured vectors; the HSC real-space
     file is the CosmoSIS-library one, wider than the Li+23 analysis cuts).
-    KiDS downloads a 50-130 MB release tarball on first use.
+    KiDS downloads a 50-130 MB release tarball on first use. des_y6 returns
+    a not-yet-public notice (available=False, no files) until DES releases
+    the Y6 2pt products.
     """
     import pandas as pd
 
+    if not io.datavectors_available(dataset):
+        st = DATASETS[dataset]["datavector_status"]
+        return ok(st["notice"], [], dataset=dataset, statistic=statistic, available=False,
+                  notice=st["notice"], enable_hint=st["enable"],
+                  alternative="fetch_des_y6_chain (published Y6 chains, comparison only); des_y3 data vectors")
     blk, cov, ext = io.load_statistic(dataset, statistic)
     out = resolve_outdir(output_dir)
     err = np.sqrt(np.clip(np.diag(cov), 0, None))

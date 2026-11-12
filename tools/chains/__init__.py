@@ -15,10 +15,11 @@ from pydantic import Field, validate_call
 
 from ..common import ArtifactResult, data_cache_dir, data_kind, mpl, ok, resolve_outdir, save_fig
 from ..datavectors import io as dvio
-from ..registry import PLANCK18_S8, PUBLISHED_S8
+from ..registry import DES_Y6_CHAIN_FILES, PLANCK18_S8, PUBLISHED_S8
 from . import kernels
 
-__all__ = ["fetch_wl_chain", "analyze_wl_chain", "plot_s8_om_contours", "compare_s8_with_published"]
+__all__ = ["fetch_wl_chain", "analyze_wl_chain", "plot_s8_om_contours", "compare_s8_with_published",
+           "fetch_des_y6_chain"]
 
 DISPATCH_KERNELS = {
     "chain_marginals": {
@@ -56,10 +57,16 @@ def chain_source(dataset: str, chain: str) -> tuple[str, str | None]:
     if "archive" in meta:
         return meta["archive"], rel
     from ..registry import DES_Y3_CHAINS
-    return DES_Y3_CHAINS + rel, None
+    return meta.get("chains_base", DES_Y3_CHAINS) + rel, None
 
 
 def chain_local_path(dataset: str, chain: str) -> Path:
+    if dataset == "des_y6" and DES_Y6_CHAIN_FILES.get(chain, {}).get("size_mb", 0) > 1000:
+        manual0 = data_cache_dir() / dataset / DES_Y6_CHAIN_FILES[chain]["file"]
+        if not manual0.is_file():
+            raise RuntimeError(f"des_y6 chain {chain!r} is {DES_Y6_CHAIN_FILES[chain]['size_mb'] / 1000:.1f} GB; "
+                               f"not downloaded by default. Use fetch_des_y6_chain(..., allow_large=True) or place "
+                               f"it at {manual0}.")
     manual = data_cache_dir() / dataset / f"{chain}.txt"
     if manual.is_file():
         return manual
@@ -75,7 +82,8 @@ def fetch_wl_chain(
     dataset: Annotated[Dataset, Field(description="Survey release key.")],
     chain: Annotated[str, Field(description="Chain key, see describe_wl_dataset(...)['chains']: des_y3 "
                                             "3x2pt_lcdm, 3x2pt_wcdm, 1x2pt_lcdm, 2x2pt_lcdm, planck_lcdm, ...; "
-                                            "kids_* cosebis, bandpowers, xipm.")],
+                                            "des_y6 3x2pt_lcdm, 1x2pt_lcdm, 3x2pt_cmb_lcdm, ... (see "
+                                            "fetch_des_y6_chain); kids_* cosebis, bandpowers, xipm.")],
     output_dir: OutDir,
     max_rows: Annotated[int, Field(ge=1000, le=2_000_000, description="Cap on rows written to the CSV "
                                                                       "(highest-weight rows kept).")] = 200_000,
@@ -270,3 +278,81 @@ def compare_s8_with_published(
               [csv, png], tension_sigma=summary, reference={"mean": reference_mean, "sigma": reference_sigma,
                                                              "citation": PLANCK18_S8["citation"]})
 
+
+
+Y6Chain = Literal[tuple(DES_Y6_CHAIN_FILES)]  # type: ignore[valid-type]
+
+
+def _y6_download(chain: str, allow_large: bool) -> Path:
+    from ..registry import DES_Y6_CHAINS
+    info = DES_Y6_CHAIN_FILES[chain]
+    if info["size_mb"] > 1000 and not allow_large:
+        dest = data_cache_dir() / "des_y6" / info["file"]
+        if not dest.is_file():
+            raise RuntimeError(f"des_y6 chain {chain!r} is {info['size_mb'] / 1000:.1f} GB; pass allow_large=True to "
+                               f"download it (or place it at {dest}).")
+    return dvio.download(DES_Y6_CHAINS + info["file"], subdir="des_y6", timeout=3600)
+
+
+@data_kind("published_result")
+@validate_call
+def fetch_des_y6_chain(
+    output_dir: OutDir,
+    chain: Annotated[Y6Chain, Field(description="DES Y6 chain key: 3x2pt_lcdm (FIDUCIAL, 370 MB), 1x2pt_lcdm "
+                                                "(cosmic shear, 15 MB), 1x2pt_nla_lcdm, 2x2pt_lcdm, "
+                                                "3x2pt_linbias_lcdm, 3x2pt_fixmnu_lcdm, 3x2pt_wcdm, cmb_lcdm, "
+                                                "3x2pt_cmb_lcdm (2.5 MB), 3x2pt_bao_sn_clusters_lcdm, "
+                                                "3x2pt_cmb_wcdm, 3x2pt_bao_bbn_lcdm, 3x2pt_nonlin_wcdm (4.5 GB).")]
+    = "3x2pt_lcdm",
+    plot: Annotated[bool, Field(description="Also write an Omega_m - S8 68/95% contour PNG.")] = True,
+    allow_large: Annotated[bool, Field(description="Permit the 4.5 GB 3x2pt_nonlin_wcdm download.")] = False,
+    max_rows: Annotated[int, Field(ge=1000, le=2_000_000, description="Cap on rows in the slim CSV "
+                                                                      "(highest-weight kept).")] = 200_000,
+) -> ArtifactResult:
+    """DES Y6 published chain: download, weighted Om / sigma8 / S8 (w0, wa) summaries, contour (published result, for comparison only).
+
+    Use for 'what does DES Y6 find' or to put your own analysis next to
+    the DES Y6 posterior. Files come from the public DES Y6 chains_release
+    (desdr-server.ncsa.illinois.edu/despublic/y6a2_files/y6_key/chains_release/)
+    and are cached. Column names are read from the CosmoSIS header;
+    Nautilus chains are weighted by exp(log_weight), csislike combined
+    chains by their 'weights' column; non-finite / zero weights are dropped.
+    Reports weighted mean, std and 16/50/84% quantiles. Writes a summary
+    JSON, a slim chain CSV (weight, omega_m, sigma_8, S_8, ...; feeds
+    plot_s8_om_contours / compare_s8_with_published) and optionally a PNG.
+    Sanity (fiducial 3x2pt_lcdm): S8 = 0.789 +/- 0.012, Om = 0.333
+    +0.023/-0.028 (paper, arXiv:2601.14559); chain mean S8 = 0.789 +/- 0.011,
+    Om = 0.325 +/- 0.023, sigma8 = 0.759 +/- 0.033.
+    """
+    import json
+
+    import pandas as pd
+
+    path = _y6_download(chain, allow_large)
+    cols, data = kernels.parse_cosmosis_text(path)
+    sc = kernels.standard_columns(cols, data)
+    payload = kernels.summarize_columns(sc)
+    info = DES_Y6_CHAIN_FILES[chain]
+    payload.update(dataset="des_y6", chain=chain, file=info["file"], description=info["desc"],
+                   n_raw_columns=len(cols), published_reference=PUBLISHED_S8["DES Y6 3x2pt"])
+    out = resolve_outdir(output_dir)
+    js = out / f"des_y6_{chain}_marginals.json"
+    js.write_text(json.dumps(payload, indent=2))
+    df = pd.DataFrame(sc)
+    if len(df) > max_rows:
+        df = df.nlargest(max_rows, "weight")
+    csv = out / f"des_y6_{chain}_chain.csv"
+    df.to_csv(csv, index=False)
+    files = [js, csv]
+    if plot:
+        files += plot_s8_om_contours([str(csv)], output_dir, labels=[f"DES Y6 {chain}"]).files
+        png = Path(files[-1])
+        files[-1] = png.rename(png.with_name(f"des_y6_{chain}_S8_om.png"))
+    P = payload["params"]
+    msg = (f"DES Y6 {chain}: S8 = {_fmt(P['S_8'])}, Om = {_fmt(P['omega_m'])}, sigma8 = {_fmt(P['sigma_8'])}"
+           + (f", w = {_fmt(P['w'])}" if "w" in P else "") + (f", wa = {_fmt(P['wa'])}" if "wa" in P else "")
+           + f" ({payload['n_samples']} samples, n_eff = {payload['n_eff']}).")
+    return ok(msg, files, source_file=str(path), **payload)
+
+
+fetch_des_y6_chain.weight = "heavy"

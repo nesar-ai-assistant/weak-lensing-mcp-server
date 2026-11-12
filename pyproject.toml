@@ -23,6 +23,7 @@ dependencies = [
 
 [project.optional-dependencies]
 getdist = ["getdist"]
+theory = ["camb>=1.5"]  # predict_shear_correlation (CAMB halofit P(k))
 dev = ["pytest", "anyio", "ruff"]
 # hpc = ["hep-genesis[iri]"]  # server-side dispatch: pip install -e <hep-genesis-agent>/backend[iri]
 
@@ -36,6 +37,7 @@ tool_modules = [
     "tools.catalogs",
     "tools.datavectors",
     "tools.chains",
+    "tools.theory",
     "mcp_server.dispatch",
 ]
 

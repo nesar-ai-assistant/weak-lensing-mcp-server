@@ -48,7 +48,7 @@ def fetch_wl_datavector(
     compute_signal_to_noise. Data vectors are the published ones (scale
     cuts NOT applied: DES/KiDS files are the full measured vectors; the HSC real-space
     file is the CosmoSIS-library one, wider than the Li+23 analysis cuts).
-    KiDS downloads a 50-130 MB release tarball on first use. des_y6 returns
+    KiDS downloads its release tarball (17 MB KiDS-1000, 131 MB KiDS-Legacy) on first use. des_y6 returns
     a not-yet-public notice (available=False, no files) until DES releases
     the Y6 2pt products.
     """

@@ -92,8 +92,8 @@ def fetch_wl_chain(
 
     Use before analyze_wl_chain / plot_s8_om_contours. The CSV holds
     weight, omega_m, sigma_8, S_8 (derived as sigma_8 sqrt(Om/0.3) where the
-    chain lacks it or has NaN) and h0 / w when present. DES chains are
-    5-50 MB each; KiDS chains come from the release tarball. HSC Y3 chains
+    chain lacks it or has NaN) and h0 / w when present. DES Y3 chains are
+    5-50 MB each (DES Y6: 2.5-390 MB, see fetch_des_y6_chain); KiDS chains come from the release tarball. HSC Y3 chains
     need HSC-SSP credentials (clear error + manual-download path).
     """
     import pandas as pd
